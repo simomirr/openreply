@@ -58,6 +58,18 @@ const createAutomationSchema = z
       .optional()
       .nullable(),
     secondaryButtonLabel: z.string().max(20).optional().nullable(),
+    // Up to two tracked links rendered as real buttons on the follow-up
+    // message, sent alongside it in the same button template.
+    followUpDestinationUrl: z
+      .union([z.string().url(), z.literal("")])
+      .optional()
+      .nullable(),
+    followUpButtonLabel: z.string().max(20).optional().nullable(),
+    followUpSecondaryDestinationUrl: z
+      .union([z.string().url(), z.literal("")])
+      .optional()
+      .nullable(),
+    followUpSecondaryButtonLabel: z.string().max(20).optional().nullable(),
     isActive: z.boolean().optional().default(true),
     wholeWordMatch: z.boolean().optional().default(true),
   })
@@ -119,6 +131,17 @@ const updateAutomationSchema = z.object({
     .optional()
     .nullable(),
   secondaryButtonLabel: z.string().max(20).optional().nullable(),
+  // Same semantics again, for the follow-up message's own two link buttons.
+  followUpDestinationUrl: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .nullable(),
+  followUpButtonLabel: z.string().max(20).optional().nullable(),
+  followUpSecondaryDestinationUrl: z
+    .union([z.string().url(), z.literal("")])
+    .optional()
+    .nullable(),
+  followUpSecondaryButtonLabel: z.string().max(20).optional().nullable(),
 });
 
 export async function GET(request: NextRequest) {
@@ -341,11 +364,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { trackedDestinationUrl, secondaryDestinationUrl, secondaryButtonLabel } =
-    parsed.data;
+  const {
+    trackedDestinationUrl,
+    secondaryDestinationUrl,
+    secondaryButtonLabel,
+    followUpDestinationUrl,
+    followUpButtonLabel,
+    followUpSecondaryDestinationUrl,
+    followUpSecondaryButtonLabel,
+  } = parsed.data;
 
-  // The primary link's button title comes from `linkButtonLabel`; the second
-  // link stores its own button title in the tracked link's `label` field.
+  // The primary link's button title comes from `linkButtonLabel`; every other
+  // link (the reveal message's second button, and the follow-up's two
+  // buttons) stores its own title in the tracked link's `label` field.
+  // Order matters: slots [0]/[1] belong to the reveal message, [2]/[3] to the
+  // follow-up — see the matching slice in dm-worker's processFollowUp.
   const linkCreates: {
     workspaceId: string;
     slug: string;
@@ -366,6 +399,22 @@ export async function POST(request: NextRequest) {
       slug: generateTrackedLinkSlug(),
       label: secondaryButtonLabel?.trim() || "Open link",
       destinationUrl: secondaryDestinationUrl,
+    });
+  }
+  if (followUpDestinationUrl) {
+    linkCreates.push({
+      workspaceId,
+      slug: generateTrackedLinkSlug(),
+      label: followUpButtonLabel?.trim() || "Open link",
+      destinationUrl: followUpDestinationUrl,
+    });
+  }
+  if (followUpSecondaryDestinationUrl) {
+    linkCreates.push({
+      workspaceId,
+      slug: generateTrackedLinkSlug(),
+      label: followUpSecondaryButtonLabel?.trim() || "Open link",
+      destinationUrl: followUpSecondaryDestinationUrl,
     });
   }
 
@@ -500,6 +549,10 @@ export async function PATCH(request: NextRequest) {
     trackedDestinationUrl,
     secondaryDestinationUrl,
     secondaryButtonLabel,
+    followUpDestinationUrl,
+    followUpButtonLabel,
+    followUpSecondaryDestinationUrl,
+    followUpSecondaryButtonLabel,
     ...automationData
   } = parsed.data;
 
@@ -599,6 +652,73 @@ export async function PATCH(request: NextRequest) {
           slug: generateTrackedLinkSlug(),
           label: secondaryLabel,
           destinationUrl: secondaryDestinationUrl,
+        },
+      });
+    }
+  }
+
+  // Update, create, or clear the follow-up message's first link button. It is
+  // always the link at index [2] (ordered by createdAt) — slots [0]/[1] are
+  // the reveal message's buttons.
+  if (followUpDestinationUrl !== undefined && followUpDestinationUrl !== null) {
+    const links = await prisma.trackedLink.findMany({
+      where: { automationId },
+      orderBy: { createdAt: "asc" },
+    });
+    const link = links[2];
+    const label = followUpButtonLabel?.trim() || "Open link";
+
+    if (followUpDestinationUrl === "") {
+      if (link) {
+        await prisma.trackedLink.delete({ where: { id: link.id } });
+      }
+    } else if (link) {
+      await prisma.trackedLink.update({
+        where: { id: link.id },
+        data: { destinationUrl: followUpDestinationUrl, label },
+      });
+    } else {
+      await prisma.trackedLink.create({
+        data: {
+          workspaceId,
+          automationId,
+          slug: generateTrackedLinkSlug(),
+          label,
+          destinationUrl: followUpDestinationUrl,
+        },
+      });
+    }
+  }
+
+  // Same for the follow-up's second link button, index [3].
+  if (
+    followUpSecondaryDestinationUrl !== undefined &&
+    followUpSecondaryDestinationUrl !== null
+  ) {
+    const links = await prisma.trackedLink.findMany({
+      where: { automationId },
+      orderBy: { createdAt: "asc" },
+    });
+    const link = links[3];
+    const label = followUpSecondaryButtonLabel?.trim() || "Open link";
+
+    if (followUpSecondaryDestinationUrl === "") {
+      if (link) {
+        await prisma.trackedLink.delete({ where: { id: link.id } });
+      }
+    } else if (link) {
+      await prisma.trackedLink.update({
+        where: { id: link.id },
+        data: { destinationUrl: followUpSecondaryDestinationUrl, label },
+      });
+    } else {
+      await prisma.trackedLink.create({
+        data: {
+          workspaceId,
+          automationId,
+          slug: generateTrackedLinkSlug(),
+          label,
+          destinationUrl: followUpSecondaryDestinationUrl,
         },
       });
     }
