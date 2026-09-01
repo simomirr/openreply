@@ -40,6 +40,10 @@ interface CampaignPreviewProps {
   followUpEnabled: boolean;
   followUpMessage: string;
   followUpDelayMinutes?: number;
+  followUpHasLink?: boolean;
+  followUpLinkButtonLabel?: string;
+  followUpHasSecondLink?: boolean;
+  followUpSecondLinkButtonLabel?: string;
 }
 
 const SAMPLE_USER = "username";
@@ -321,6 +325,10 @@ function DmScreen({
   followUpEnabled,
   followUpMessage,
   followUpDelayMinutes = 0,
+  followUpHasLink = false,
+  followUpLinkButtonLabel = "Open link",
+  followUpHasSecondLink = false,
+  followUpSecondLinkButtonLabel = "Open link",
   linkUrl,
   inboundMessage,
 }: {
@@ -341,6 +349,10 @@ function DmScreen({
   followUpEnabled: boolean;
   followUpMessage: string;
   followUpDelayMinutes?: number;
+  followUpHasLink?: boolean;
+  followUpLinkButtonLabel?: string;
+  followUpHasSecondLink?: boolean;
+  followUpSecondLinkButtonLabel?: string;
   // Present on the keyword-trigger thread: the DM the user sends to start it.
   inboundMessage?: string;
 }) {
@@ -449,12 +461,24 @@ function DmScreen({
             )}
             <div className="flex items-end gap-2">
               <Avatar url={avatarUrl} size={24} />
-              <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-zinc-800 px-3 py-2">
-                <p className="whitespace-pre-wrap text-sm">
+              <div className="max-w-[80%] overflow-hidden rounded-2xl rounded-bl-md bg-zinc-800">
+                <p className="whitespace-pre-wrap px-3 py-2 text-sm">
                   {followUpMessage.trim()
                     ? followUpMessage.replace(/\{username\}/g, SAMPLE_USER)
                     : "Btw just wanted to say thanks for following me, I appreciate the support 🙌"}
                 </p>
+                {followUpHasLink && (
+                  <>
+                    <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
+                      {followUpLinkButtonLabel || "Open link"}
+                    </div>
+                    {followUpHasSecondLink && (
+                      <div className="mx-1.5 mb-1.5 rounded-xl bg-zinc-700 px-4 py-1.5 text-center text-sm font-medium text-white">
+                        {followUpSecondLinkButtonLabel || "Open link"}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -527,6 +551,10 @@ export default function CampaignPreview(props: CampaignPreviewProps) {
             followUpEnabled={props.followUpEnabled}
             followUpMessage={props.followUpMessage}
             followUpDelayMinutes={props.followUpDelayMinutes}
+            followUpHasLink={props.followUpHasLink}
+            followUpLinkButtonLabel={props.followUpLinkButtonLabel}
+            followUpHasSecondLink={props.followUpHasSecondLink}
+            followUpSecondLinkButtonLabel={props.followUpSecondLinkButtonLabel}
             linkUrl={props.linkUrl}
           />
         )}
@@ -549,6 +577,10 @@ export default function CampaignPreview(props: CampaignPreviewProps) {
             followUpEnabled={props.followUpEnabled}
             followUpMessage={props.followUpMessage}
             followUpDelayMinutes={props.followUpDelayMinutes}
+            followUpHasLink={props.followUpHasLink}
+            followUpLinkButtonLabel={props.followUpLinkButtonLabel}
+            followUpHasSecondLink={props.followUpHasSecondLink}
+            followUpSecondLinkButtonLabel={props.followUpSecondLinkButtonLabel}
             linkUrl={props.linkUrl}
             inboundMessage={props.sampleComment}
           />

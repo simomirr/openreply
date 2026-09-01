@@ -180,6 +180,14 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [followUpMessage, setFollowUpMessage] = useState("");
   const [followUpDelayMinutes, setFollowUpDelayMinutes] = useState(0);
+  const [followUpLinkOpen, setFollowUpLinkOpen] = useState(false);
+  const [followUpDestinationUrl, setFollowUpDestinationUrl] = useState("");
+  const [followUpButtonLabel, setFollowUpButtonLabel] = useState("Open link");
+  const [followUpSecondLinkOpen, setFollowUpSecondLinkOpen] = useState(false);
+  const [followUpSecondaryDestinationUrl, setFollowUpSecondaryDestinationUrl] =
+    useState("");
+  const [followUpSecondaryButtonLabel, setFollowUpSecondaryButtonLabel] =
+    useState("Open link");
 
   const [previewTab, setPreviewTab] = useState<PreviewTab>("dm");
 
@@ -288,6 +296,18 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
         setFollowUpEnabled(c.followUpEnabled ?? false);
         setFollowUpMessage(c.followUpMessage ?? "");
         setFollowUpDelayMinutes(c.followUpDelayMinutes ?? 0);
+        const followUpLink = c.trackedLinks?.[2];
+        setFollowUpDestinationUrl(followUpLink?.destinationUrl ?? "");
+        setFollowUpButtonLabel(followUpLink?.label ?? "Open link");
+        setFollowUpLinkOpen(Boolean(followUpLink?.destinationUrl));
+        const followUpSecondLink = c.trackedLinks?.[3];
+        setFollowUpSecondaryDestinationUrl(
+          followUpSecondLink?.destinationUrl ?? ""
+        );
+        setFollowUpSecondaryButtonLabel(
+          followUpSecondLink?.label ?? "Open link"
+        );
+        setFollowUpSecondLinkOpen(Boolean(followUpSecondLink?.destinationUrl));
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
@@ -427,6 +447,15 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
       followUpEnabled,
       followUpMessage: followUpEnabled ? followUpMessage.trim() : "",
       followUpDelayMinutes: followUpEnabled ? followUpDelayMinutes : 0,
+      followUpDestinationUrl: followUpEnabled
+        ? followUpDestinationUrl.trim()
+        : "",
+      followUpButtonLabel: followUpButtonLabel.trim() || "Open link",
+      followUpSecondaryDestinationUrl: followUpEnabled
+        ? followUpSecondaryDestinationUrl.trim()
+        : "",
+      followUpSecondaryButtonLabel:
+        followUpSecondaryButtonLabel.trim() || "Open link",
       isActive: activeValue,
     };
 
@@ -975,6 +1004,60 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
                   {" {username}"} personalizes it. Max 24 hours, to stay inside
                   Instagram&apos;s messaging window.
                 </p>
+                {followUpLinkOpen ? (
+                  <div className="space-y-2 border-t border-border pt-2">
+                    <input
+                      value={followUpDestinationUrl}
+                      onChange={(e) => setFollowUpDestinationUrl(e.target.value)}
+                      placeholder="https://yourlink.com/offer"
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                    />
+                    <input
+                      value={followUpButtonLabel}
+                      onChange={(e) => setFollowUpButtonLabel(e.target.value)}
+                      placeholder="Button label (e.g. Open link)"
+                      maxLength={20}
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                    />
+                    {followUpSecondLinkOpen ? (
+                      <div className="space-y-2 border-t border-border pt-2">
+                        <input
+                          value={followUpSecondaryDestinationUrl}
+                          onChange={(e) =>
+                            setFollowUpSecondaryDestinationUrl(e.target.value)
+                          }
+                          placeholder="https://yourlink.com/second"
+                          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                        />
+                        <input
+                          value={followUpSecondaryButtonLabel}
+                          onChange={(e) =>
+                            setFollowUpSecondaryButtonLabel(e.target.value)
+                          }
+                          placeholder="Second button label"
+                          maxLength={20}
+                          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground placeholder:text-zinc-500 focus:border-accent/40 focus:outline-none"
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setFollowUpSecondLinkOpen(true)}
+                        className="w-full rounded-lg border border-border py-2 text-sm text-muted hover:text-foreground"
+                      >
+                        + Add A Second Link
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setFollowUpLinkOpen(true)}
+                    className="w-full rounded-lg border border-border py-2 text-sm text-muted hover:text-foreground"
+                  >
+                    + Add Real Buttons To This Message
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1013,6 +1096,17 @@ export default function CampaignBuilder({ mode, campaignId }: CampaignBuilderPro
             followUpEnabled={followUpEnabled}
             followUpMessage={followUpMessage}
             followUpDelayMinutes={followUpDelayMinutes}
+            followUpHasLink={
+              followUpLinkOpen && Boolean(followUpDestinationUrl.trim())
+            }
+            followUpLinkButtonLabel={followUpButtonLabel || "Open link"}
+            followUpHasSecondLink={
+              followUpSecondLinkOpen &&
+              Boolean(followUpSecondaryDestinationUrl.trim())
+            }
+            followUpSecondLinkButtonLabel={
+              followUpSecondaryButtonLabel || "Open link"
+            }
           />
         </div>
       </div>
