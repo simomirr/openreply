@@ -888,6 +888,19 @@ async function processPostback(job: Job<ProcessPostbackJob>): Promise<void> {
 }
 
 /**
+ * Fallback text for the follow-up when Meta rejects its button template: the
+ * follow-up message has no {link} token (unlike the reveal message), so this
+ * just appends each tracked URL on its own line after the body text.
+ */
+function buildFollowUpInlineFallback(
+  bodyText: string,
+  trackedLinks: WorkerTrackedLink[]
+): string {
+  const urls = trackedLinks.map((link) => buildTrackedUrl(link.slug));
+  return urls.length > 0 ? `${bodyText}\n${urls.join("\n")}` : bodyText;
+}
+
+/**
  * Send the scheduled appreciation follow-up. Runs after its delay elapses.
  * Best-effort: if the message can't be delivered (e.g. the 24-hour messaging
  * window closed because the delay was long), it is logged, not retried forever.
@@ -897,7 +910,15 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
 
   const automation = await prisma.automation.findFirst({
     where: { id: automationId, isActive: true },
-    include: { instagramAccount: true },
+    include: {
+      instagramAccount: true,
+      // Slots [2] and [3] (ordered by createdAt) are this campaign's
+      // follow-up buttons — [0] and [1] belong to the reveal message.
+      trackedLinks: {
+        select: { slug: true, label: true, destinationUrl: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
 
   if (
@@ -917,16 +938,48 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
     return;
   }
 
+  const followUpLinks = automation.trackedLinks.slice(2, 4);
+  const bodyText =
+    renderMessageWithoutLink({
+      message: automation.followUpMessage,
+      commenterName: commenterName ?? null,
+    }) || "";
+
   try {
-    await sendDirectMessage(
-      accessToken,
-      automation.instagramAccount.instagramId,
-      userId,
-      renderMessageWithoutLink({
-        message: automation.followUpMessage,
-        commenterName: commenterName ?? null,
-      })
-    );
+    if (followUpLinks.length === 0) {
+      await sendDirectMessage(
+        accessToken,
+        automation.instagramAccount.instagramId,
+        userId,
+        bodyText
+      );
+      return;
+    }
+
+    // Same button-template-first, text-fallback pattern as the reveal
+    // message: up to 3 real tappable buttons, sent in a single message.
+    const buttons = buildLinkButtons(followUpLinks, null);
+    try {
+      await sendDirectMessageWithLinkButton(
+        accessToken,
+        automation.instagramAccount.instagramId,
+        userId,
+        bodyText || "Here's more:",
+        buttons
+      );
+    } catch (buttonError) {
+      if (!isTemplateRejection(buttonError)) throw buttonError;
+      console.log(
+        "[DM Worker] Follow-up button template rejected, falling back to inline link:",
+        formatError(buttonError)
+      );
+      await sendDirectMessage(
+        accessToken,
+        automation.instagramAccount.instagramId,
+        userId,
+        buildFollowUpInlineFallback(bodyText, followUpLinks)
+      );
+    }
   } catch (error) {
     console.log(
       "[DM Worker] Failed to send follow-up message:",
